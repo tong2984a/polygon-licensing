@@ -1,4 +1,5 @@
 import '../styles/globals.css'
+import '../styles/spinner.css'
 import Link from 'next/link'
 
 function Marketplace({ Component, pageProps }) {
@@ -20,6 +21,11 @@ function Marketplace({ Component, pageProps }) {
           <Link href="/my-collection">
             <a className="mr-6 text-pink-500">
               My Collection
+            </a>
+          </Link>
+          <Link href="/check-owner">
+            <a className="mr-6 text-pink-500">
+              Check Owner
             </a>
           </Link>
         </div>

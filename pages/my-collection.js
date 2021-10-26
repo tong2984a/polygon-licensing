@@ -52,24 +52,25 @@ export default function MyCollection() {
       getMETT(accounts[0]);
     }
   }
-  function connect() {
-    console.log("****connect");
-    window.ethereum
-      .request({ method: 'eth_requestAccounts' })
-      .then(handleAccountsChanged)
-      .catch((err) => {
-        if (err.code === 4001) {
-          // EIP-1193 userRejectedRequest error
-          // If this happens, the user rejected the connection request.
-          console.log('Please connect to MetaMask.');
-        } else {
-          console.error(err);
-        }
-      });
-  }
   useEffect(() => {
-    connect()
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    if (window.ethereum) {
+      window.ethereum
+        .request({ method: 'eth_requestAccounts' })
+        .then(handleAccountsChanged)
+        .catch((err) => {
+          if (err.code === 4001) {
+            // EIP-1193 userRejectedRequest error
+            // If this happens, the user rejected the connection request.
+            console.log('Please connect to MetaMask.');
+          } else {
+            console.error(err);
+          }
+        });
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+    } else {
+      console.log("Non-Ethereum browser detected. You should consider installing MetaMask.");
+      setAddress("Non-Ethereum browser detected. You should consider installing MetaMask.")
+    }
     return function cleanup() {
       //mounted = false
     }
@@ -115,10 +116,10 @@ export default function MyCollection() {
         items.push(item)
       })
 
-      const myItems = items.filter(i => i.seller === address)
+      //const myItems = items.filter(i => i.seller === address)
       //console.log("myItems", myItems)
       const bougntItems = items.filter(i => i.owner === address && i.seller !== address)
-      setNfts(myItems)
+      //setNfts(myItems)
       setBought(bougntItems)
       setLoadingState('loaded')
     }
@@ -127,7 +128,11 @@ export default function MyCollection() {
       //mounted = false
     }
   }, [address])
-
+  function copyUrl(nft) {
+    navigator.clipboard.writeText(nft.image);
+    navigator.clipboard.writeText(nft.image)
+         .then(() => alert("Copied the text: " + nft.image))
+  }
   async function loadNFTs() {
     const web3Modal = new Web3Modal({
       network: "mainnet",
@@ -183,41 +188,30 @@ export default function MyCollection() {
   }
   if (showModal) return (
     <div className="p-4">
+      <div className="header">{address}</div>
       <p>Please wait. Your METAMASK wallet will prompt you once for putting your creative work up on auction.</p>
+      <div className="loader"></div>
     </div>
   )
-  if ((loadingState === 'loaded') && (nfts.length == 0) && (bought.length == 0)) return (<h1 className="py-10 px-20 text-3xl">No assets created</h1>)
+  if ((loadingState === 'loaded') && (nfts.length == 0) && (bought.length == 0)) return (
+    <div className="p-4">
+      <div className="header">{address}</div>
+      <h1 className="py-10 px-20 text-3xl">No assets created</h1>
+    </div>
+  )
   return (
     <div>
+      <div className="header">{address}</div>
       <div className="p-4">
         <h2 className="text-2xl py-2">My Collection - where you can find your license purchases.</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
           {
-            nfts.map((nft, i) => (
-              <div key={i} className="border shadow rounded-xl overflow-hidden  bg-black">
-                <div className="p-4 bg-white">
-                  <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
-                  <div style={{ height: '70px', overflow: 'hidden' }}>
-                    <p className="text-gray-400">AI Rating: {nft.rating}</p>
-                    <p className="text-gray-400">Asset Category: {nft.rfp}</p>
-                    <p className="text-gray-400">Description:{nft.description}</p>
-                  </div>
-                </div>
-                {nft.sold ?
-                  (<div className="p-4 bg-black">
-                    <p className="text-2xl font-bold text-red-500">List Price - {nft.price} MATIC</p>
-                  </div>)
-                  :
-
-                (<div className="p-4 bg-black">
-                  <p className="text-2xl font-bold text-white">List Price - {nft.price} MATIC</p>
-                </div>)}
-              </div>
-            ))
-          }
-          {
             bought.map((nft, i) => (
               <div key={i} className="border shadow rounded-xl overflow-hidden bg-black">
+                <embed
+                   src={nft.image}
+                   width="250"
+                   height="200" />
                 <div className="p-4 bg-white">
                   <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
                   <div style={{ height: '70px', overflow: 'hidden' }}>
@@ -228,6 +222,9 @@ export default function MyCollection() {
                 </div>
                 <div className="p-4 bg-black">
                   <p className="text-2xl font-bold text-red-500">Cost - {nft.price} MATIC</p>
+                  <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={() => copyUrl(nft)}>
+                    Copy NFT
+                  </button>
                 </div>
               </div>
             ))

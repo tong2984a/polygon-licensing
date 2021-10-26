@@ -6,7 +6,7 @@ import { useRouter } from 'next/router'
 import Web3Modal from 'web3modal'
 import Image from 'next/image'
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore, collection, addDoc, getDocs } from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import { getAuth } from "firebase/auth"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
@@ -20,14 +20,16 @@ import NFT from '../artifacts/contracts/NFT.sol/NFT.json'
 import Market from '../artifacts/contracts/Market.sol/NFTMarket.json'
 
 export default function CreateItem() {
+  const [nfts, setNfts] = useState([])
   const [fileUrl, setFileUrl] = useState(null)
   const [fileUploadProgress, setFileUploadProgress] = useState(null)
   const [showModalIPFS, setShowModalIPFS] = useState(false);
-  const [showModalMint, setShowModalMint] = useState(false);
-  const [formInput, updateFormInput] = useState({ price: '', name: '', description: '' })
+  const [showModalChecking, setShowModalChecking] = useState(false);
+  const [formInput, updateFormInput] = useState({ fileUrl: '', owner: '' })
   const router = useRouter()
   const [address, setAddress] = useState('')
   const [optionsState, setOptionsState] = useState('')
+  const [src, setSrc] = useState('')
   const [isImageReady, setIsImageReady] = useState(false);
 
   // For now, 'eth_accounts' will continue to always return an array
@@ -57,7 +59,6 @@ export default function CreateItem() {
         });
       window.ethereum.on('accountsChanged', handleAccountsChanged);
     } else {
-      console.log("Non-Ethereum browser detected. You should consider installing MetaMask.");
       setAddress("Non-Ethereum browser detected. You should consider installing MetaMask.")
     }
     return function cleanup() {
@@ -68,8 +69,8 @@ export default function CreateItem() {
     setFileUrl(null)
     setShowModalIPFS(true)
     const file = e.target.files[0]
+    setSrc(URL.createObjectURL(event.target.files[0]))
     try {
-      /*
       const firebaseConfig = {
         // INSERT YOUR OWN CONFIG HERE
         apiKey: "AIzaSyBg34hCq_jGHdj-HNWi2ZjfqhM2YgWq4ek",
@@ -122,17 +123,15 @@ export default function CreateItem() {
           setShowModalIPFS(false)
         }
       );
-      */
 
-      const added = await client.add(
-        file,
-        {
-          progress: (prog) => console.log(`received: ${prog}`)
-        }
-      )
-      const url = `https://ipfs.infura.io/ipfs/${added.path}`
-      setFileUrl(url)
-      setShowModalIPFS(false)
+      // const added = await client.add(
+      //   file,
+      //   {
+      //     progress: (prog) => console.log(`received: ${prog}`)
+      //   }
+      // )
+      // const url = `https://ipfs.infura.io/ipfs/${added.path}`
+      //setFileUrl(url)
     } catch (error) {
       console.log('Error uploading file: ', error)
     }
@@ -161,8 +160,8 @@ export default function CreateItem() {
   function handleChange(event) {
     setOptionsState(event.target.value);
   }
-  async function createFirebase(url) {
-    setShowModalMint(true)
+  async function checkFirebase(url) {
+    setShowModalChecking(true)
 
     const firebaseConfig = {
       // INSERT YOUR OWN CONFIG HERE
@@ -187,63 +186,38 @@ export default function CreateItem() {
       const db = getFirestore(app)
       //const auth = getAuth(app)
 
-      const colRef = collection(db, 'licensing')
-      addDoc(colRef, {
-        name: formInput.name,
-        description: formInput.description,
-        price: formInput.price,
-        fileUrl: fileUrl,
-        seller: address,
-        owner: address,
-        rfp: optionsState,
-        rating: getRndInteger(30, 99),
-        createdAt: Date.now()
-      });
+      const nounsRef = collection(db, "licensing");
+      const q = query(nounsRef,
+        where("fileUrl", "==", formInput.fileUrl),
+        where("owner", "==", formInput.owner));
+
+      const querySnapshot = await getDocs(q);
+      const items = [];
+      querySnapshot.forEach((doc) => {
+        let data = doc.data();
+        let item = {
+          id: doc.id,
+          price: data.price,
+          name: data.name,
+          image: data.fileUrl,
+          owner: data.owner,
+          seller: data.seller,
+          sold: data.sold
+        }
+
+        items.push(item)
+      })
+      setNfts(items)
     } catch(err){
       if (!/already exists/.test(err.message)) {
         console.error('Firebase initialization error', err.stack)}
     }
-    setShowModalMint(false)
-    router.push('/')
+    setShowModalChecking(false)
   }
 
-  async function createSale(url) {
-    setShowModalMint(true)
-    const web3Modal = new Web3Modal()
-    const connection = await web3Modal.connect()
-    const provider = new ethers.providers.Web3Provider(connection)
-    const signer = provider.getSigner()
-
-    /* next, create the item */
-    let contract = new ethers.Contract(nftaddress, NFT.abi, signer)
-    let transaction = await contract.createToken(url)
-    let tx = await transaction.wait()
-    let event = tx.events[0]
-    let value = event.args[2]
-    let tokenId = value.toNumber()
-
-    const price = ethers.utils.parseUnits(formInput.price, 'ether')
-
-    /* then list the item for sale on the marketplace */
-    contract = new ethers.Contract(nftmarketaddress, Market.abi, signer)
-    let listingPrice = await contract.getListingPrice()
-    listingPrice = listingPrice.toString()
-
-    transaction = await contract.createMarketItem(nftaddress, tokenId, price, { value: listingPrice })
-    await transaction.wait()
-    setShowModalMint(false)
-    router.push('/')
-  }
-  if (showModalIPFS) return (
+  if (showModalChecking) return (
     <div className="p-4">
-      <p>Please wait while we upload your asset.</p>
-      <p>{fileUploadProgress}</p>
-      <div className="loader"></div>
-    </div>
-  )
-  if (showModalMint) return (
-    <div className="p-4">
-      <p>Please wait. Your METAMASK will prompt you for minting NFT, and then again for adding to marketplace.</p>
+      <p>Please wait while we check your asset.</p>
       <div className="loader"></div>
     </div>
   )
@@ -262,45 +236,45 @@ export default function CreateItem() {
           <option value="Copyright">Copyright</option>
         </select>
         <input
-          placeholder="Asset Name"
+          placeholder="Asset Url"
           className="mt-8 border rounded p-4"
-          value={formInput.name}
-          onChange={e => updateFormInput({ ...formInput, name: e.target.value })}
-        />
-        <textarea
-          placeholder="Asset Description"
-          className="mt-2 border rounded p-4"
-          value={formInput.description}
-          onChange={e => updateFormInput({ ...formInput, description: e.target.value })}
+          value={formInput.fileUrl}
+          onChange={e => updateFormInput({ ...formInput, fileUrl: e.target.value })}
         />
         <input
-          placeholder="Licence Fee in MATIC"
-          className="mt-2 border rounded p-4"
-          value={formInput.price}
-          onChange={(event) => {
-            if (isFinite(event.target.value)) {
-              // UPDATE YOUR STATE (i am using formik)
-              updateFormInput({ ...formInput, price: event.target.value});
-            }
-          }}
+          placeholder="Owner Address"
+          className="mt-8 border rounded p-4"
+          value={formInput.owner}
+          onChange={e => updateFormInput({ ...formInput, owner: e.target.value })}
         />
-        <input
-          type="file"
-          name="Asset"
-          className="my-4"
-          onChange={onChange}
-          accept=".pdf"
-        />
-        <embed
-           src={fileUrl}
-           width="250"
-           height="200" />
         {
-          fileUrl &&
-          <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={createFirebase}>
-            Create Digital Asset
-          </button>
+          nfts.map((nft, i) => (
+            <div key={i} className="border shadow rounded-xl overflow-hidden bg-black">
+              <embed
+                 src={nft.image}
+                 width="250"
+                 height="200" />
+              <div className="p-4 bg-white">
+                <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
+                <div style={{ height: '70px', overflow: 'hidden' }}>
+                  <p className="text-gray-400">{nft.description}</p>
+                </div>
+              </div>
+                <div className="p-4 bg-black">
+                  <p className="text-2xl mb-4 font-bold text-white">{nft.priceDesc} MATIC</p>
+                </div>
+            </div>
+          ))
         }
+        {
+          (nfts.length == 0) &&
+          <div className="p-4">
+            <p>Sorry. We cannot find any matching records.</p>
+          </div>
+        }
+        <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={checkFirebase}>
+          Check Digital Asset
+        </button>
       </div>
     </div>
     </div>

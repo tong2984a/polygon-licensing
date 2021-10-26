@@ -19,7 +19,8 @@ import { getFirestore, collection, addDoc, getDocs, doc, updateDoc } from "fireb
 export default function Home() {
   const [nfts, setNfts] = useState([])
   const [loadingState, setLoadingState] = useState('not-loaded')
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(false)
+  const [showModalMessage, setShowModalMessage] = useState('')
   const [address, setAddress] = useState('')
   const router = useRouter()
 
@@ -35,24 +36,25 @@ export default function Home() {
       //getMETT(accounts[0]);
     }
   }
-  function connect() {
-    console.log("****connect");
-    window.ethereum
-      .request({ method: 'eth_requestAccounts' })
-      .then(handleAccountsChanged)
-      .catch((err) => {
-        if (err.code === 4001) {
-          // EIP-1193 userRejectedRequest error
-          // If this happens, the user rejected the connection request.
-          console.log('Please connect to MetaMask.');
-        } else {
-          console.error(err);
-        }
-      });
-  }
   useEffect(() => {
-    connect()
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    if (window.ethereum) {
+      window.ethereum
+        .request({ method: 'eth_requestAccounts' })
+        .then(handleAccountsChanged)
+        .catch((err) => {
+          if (err.code === 4001) {
+            // EIP-1193 userRejectedRequest error
+            // If this happens, the user rejected the connection request.
+            console.log('Please connect to MetaMask.');
+          } else {
+            console.error(err);
+          }
+        });
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+    } else {
+      console.log("Non-Ethereum browser detected. You should consider installing MetaMask.");
+      setAddress("Non-Ethereum browser detected. You should consider installing MetaMask.")
+    }
     return function cleanup() {
       //mounted = false
     }
@@ -93,7 +95,7 @@ export default function Home() {
             rating: vote.rating,
             rfp: vote.rfp
           }
-          if (!item.sold) {items.push(item)}
+          items.push(item)
         })
 
         setNfts(items)
@@ -137,30 +139,35 @@ export default function Home() {
     setLoadingState('loaded')
   }
   async function buyFirebase(nft) {
-    setShowModal(true)
-    const firebaseConfig = {
-      // INSERT YOUR OWN CONFIG HERE
-      apiKey: "AIzaSyBg34hCq_jGHdj-HNWi2ZjfqhM2YgWq4ek",
-      authDomain: "pay-a-vegan.firebaseapp.com",
-      databaseURL: "https://pay-a-vegan.firebaseio.com",
-      projectId: "pay-a-vegan",
-      storageBucket: "pay-a-vegan.appspot.com",
-      messagingSenderId: "587888386485",
-      appId: "1:587888386485:web:3a81137924d19cbe2439fc",
-      measurementId: "G-MGJK6GF9YW"
-    };
+    if (!window.ethereum) {
+      setShowModalMessage("Unable to purchase without a crypto wallet. Please refresh screen to try again.")
+    } else {
+      setShowModal(true)
+      const firebaseConfig = {
+        // INSERT YOUR OWN CONFIG HERE
+        apiKey: "AIzaSyBg34hCq_jGHdj-HNWi2ZjfqhM2YgWq4ek",
+        authDomain: "pay-a-vegan.firebaseapp.com",
+        databaseURL: "https://pay-a-vegan.firebaseio.com",
+        projectId: "pay-a-vegan",
+        storageBucket: "pay-a-vegan.appspot.com",
+        messagingSenderId: "587888386485",
+        appId: "1:587888386485:web:3a81137924d19cbe2439fc",
+        measurementId: "G-MGJK6GF9YW"
+      };
 
-    const app = initializeApp(firebaseConfig)
+      const app = initializeApp(firebaseConfig)
 
-    const db = getFirestore(app)
-    const voteRef = doc(db, "licensing", nft.id);
-    // Set the "capital" field of the city 'DC'
-    await updateDoc(voteRef, {
-      sold: true,
-      owner: address
-    });
-    setShowModal(false)
-    router.push('/my-collection')
+      const db = getFirestore(app)
+      const voteRef = doc(db, "licensing", nft.id);
+      // Set the "capital" field of the city 'DC'
+      await updateDoc(voteRef, {
+        sold: true,
+        owner: address,
+        price: nft.price
+      });
+      setShowModal(false)
+      router.push('/my-collection')
+    }
   }
   async function buyNft(nft) {
     setShowModal(true)
@@ -180,47 +187,60 @@ export default function Home() {
   }
   if (loadingState === 'loaded' && !nfts.length) return (
     <div>
+      <div className="header">{address}</div>
       <h1 className="px-20 py-10 text-3xl">No digital assets in marketplace</h1>
       <p className="px-20 py-10">Please use Submit Digital Asset to upload your asset.</p>
     </div>
   )
   if (showModal) return (
     <div className="p-4">
+      <div className="header">{address}</div>
       <p>Please wait. Your METAMASK wallet will prompt you once for the purchase.</p>
       <p>We will move your purchase to your personal Collection page.</p>
     </div>
   )
+  if (showModalMessage) return (
+    <div className="p-4">
+      <div className="header">{address}</div>
+      <p>{showModalMessage}</p>
+    </div>
+  )
   return (
     <div>
-    <div className="p-4">
-      <h1 className="text-2xl py-2">Public Home - where digital assets are put on display for licensing.</h1>
-    </div>
-    <div className="flex justify-center">
-      <div className="px-4" style={{ maxWidth: '1600px' }}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
-          {
-            nfts.map((nft, i) => (
-              <div key={i} className="border shadow rounded-xl overflow-hidden bg-black">
-                <div className="p-4 bg-white">
-                  <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
-                  <div style={{ height: '70px', overflow: 'hidden' }}>
-                    <p className="text-gray-400">AI Rating: {nft.rating}</p>
-                    <p className="text-gray-400">Asset Category: {nft.rfp}</p>
-                    <p className="text-gray-400">{nft.description}</p>
+      <div className="header">{address}</div>
+      <div className="p-4">
+        <h1 className="text-2xl py-2">Public Home - where digital assets are put on display for licensing.</h1>
+      </div>
+      <div className="flex justify-center">
+        <div className="px-4" style={{ maxWidth: '1600px' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+            {
+              nfts.map((nft, i) => (
+                <div key={i} className="border shadow rounded-xl overflow-hidden bg-black">
+                  <embed
+                     src={nft.image}
+                     width="250"
+                     height="200" />
+                  <div className="p-4 bg-white">
+                    <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
+                    <div style={{ height: '70px', overflow: 'hidden' }}>
+                      <p className="text-gray-400">AI Rating: {nft.rating}</p>
+                      <p className="text-gray-400">Asset Category: {nft.rfp}</p>
+                      <p className="text-gray-400">{nft.description}</p>
+                    </div>
                   </div>
+                    <div className="p-4 bg-black">
+                      <p className="text-2xl mb-4 font-bold text-white">{nft.price} MATIC</p>
+                      <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={() => buyFirebase(nft)}>
+                        Purchase License
+                      </button>
+                    </div>
                 </div>
-                  <div className="p-4 bg-black">
-                    <p className="text-2xl mb-4 font-bold text-white">{nft.price} MATIC</p>
-                    <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={() => buyFirebase(nft)}>
-                      Purchase License
-                    </button>
-                  </div>
-              </div>
-            ))
-          }
+              ))
+            }
+          </div>
         </div>
       </div>
-    </div>
     </div>
   )
 }
