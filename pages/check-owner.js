@@ -30,7 +30,8 @@ export default function CreateItem() {
   const [address, setAddress] = useState('')
   const [optionsState, setOptionsState] = useState('')
   const [src, setSrc] = useState('')
-  const [isImageReady, setIsImageReady] = useState(false);
+  const [isImageReady, setIsImageReady] = useState(false)
+  const [showMessage, setShowMessage] = useState('')
 
   // For now, 'eth_accounts' will continue to always return an array
   function handleAccountsChanged(accounts) {
@@ -162,7 +163,7 @@ export default function CreateItem() {
   }
   async function checkFirebase(url) {
     setShowModalChecking(true)
-
+    setShowMessage("")
     const firebaseConfig = {
       // INSERT YOUR OWN CONFIG HERE
       apiKey: "AIzaSyBg34hCq_jGHdj-HNWi2ZjfqhM2YgWq4ek",
@@ -208,6 +209,9 @@ export default function CreateItem() {
         items.push(item)
       })
       setNfts(items)
+      if (items.length == 0) {
+        setShowMessage("Sorry. We cannot find any matching records.")
+      }
     } catch(err){
       if (!/already exists/.test(err.message)) {
         console.error('Firebase initialization error', err.stack)}
@@ -267,9 +271,8 @@ export default function CreateItem() {
           ))
         }
         {
-          (nfts.length == 0) &&
           <div className="p-4">
-            <p>Sorry. We cannot find any matching records.</p>
+            <p>{showMessage}</p>
           </div>
         }
         <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={checkFirebase}>
