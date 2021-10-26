@@ -118,7 +118,7 @@ export default function MyCollection() {
 
       //const myItems = items.filter(i => i.seller === address)
       //console.log("myItems", myItems)
-      const bougntItems = items.filter(i => i.owner === address && i.seller !== address)
+      const bougntItems = items.filter(i => i.owner === address)
       //setNfts(myItems)
       setBought(bougntItems)
       setLoadingState('loaded')
