@@ -28,7 +28,6 @@ export default function CreateItem() {
   const [formInput, updateFormInput] = useState({ fileUrl: '', owner: '' })
   const router = useRouter()
   const [address, setAddress] = useState('')
-  const [optionsState, setOptionsState] = useState('')
   const [src, setSrc] = useState('')
   const [isImageReady, setIsImageReady] = useState(false)
   const [showMessage, setShowMessage] = useState('')
@@ -162,6 +161,11 @@ export default function CreateItem() {
     setOptionsState(event.target.value);
   }
   async function checkFirebase(url) {
+    const params = new URLSearchParams({ authorAddress: formInput.owner });
+    router.push({
+      pathname: '/profile',
+      search: params
+    })
     setShowModalChecking(true)
     setShowMessage("")
     const firebaseConfig = {
@@ -228,58 +232,46 @@ export default function CreateItem() {
   return (
     <div>
       <div className="header">{address}</div>
-    <div className="p-4">
-      <h2 className="text-2xl py-2">Please use the Choose File button to upload your asset.</h2>
-    </div>
-    <div className="flex justify-center">
-      <div className="w-1/2 flex flex-col pb-12">
-        <select value={optionsState} onChange={handleChange}>
-          <option value="" disabled default>Select your digital asset category</option>
-          <option value="Patent">Patent</option>
-          <option value="Trade Mark">Trade Mark</option>
-          <option value="Copyright">Copyright</option>
-        </select>
-        <input
-          placeholder="Asset Url"
-          className="mt-8 border rounded p-4"
-          value={formInput.fileUrl}
-          onChange={e => updateFormInput({ ...formInput, fileUrl: e.target.value })}
-        />
-        <input
-          placeholder="Owner Address"
-          className="mt-8 border rounded p-4"
-          value={formInput.owner}
-          onChange={e => updateFormInput({ ...formInput, owner: e.target.value })}
-        />
-        {
-          nfts.map((nft, i) => (
-            <div key={i} className="border shadow rounded-xl overflow-hidden bg-black">
-              <embed
-                 src={nft.image}
-                 width="250"
-                 height="200" />
-              <div className="p-4 bg-white">
-                <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
-                <div style={{ height: '70px', overflow: 'hidden' }}>
-                  <p className="text-gray-400">{nft.description}</p>
-                </div>
-              </div>
-                <div className="p-4 bg-black">
-                  <p className="text-2xl mb-4 font-bold text-white">{nft.priceDesc} MATIC</p>
-                </div>
-            </div>
-          ))
-        }
-        {
-          <div className="p-4">
-            <p>{showMessage}</p>
-          </div>
-        }
-        <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={checkFirebase}>
-          Check Digital Asset
-        </button>
+      <div className="p-4">
+        <h2 className="text-2xl py-2">Please use the Search button to search for an applicant.</h2>
       </div>
-    </div>
+      <div className="flex justify-center">
+        <div className="w-1/2 flex flex-col pb-12">
+          <input
+            placeholder="Owner Address"
+            className="mt-8 border rounded p-4"
+            value={formInput.owner}
+            onChange={e => updateFormInput({ ...formInput, owner: e.target.value })}
+          />
+          {
+            nfts.map((nft, i) => (
+              <div key={i} className="border shadow rounded-xl overflow-hidden bg-black">
+                <embed
+                   src={nft.image}
+                   width="250"
+                   height="200" />
+                <div className="p-4 bg-white">
+                  <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
+                  <div style={{ height: '70px', overflow: 'hidden' }}>
+                    <p className="text-gray-400">{nft.description}</p>
+                  </div>
+                </div>
+                  <div className="p-4 bg-black">
+                    <p className="text-2xl mb-4 font-bold text-white">{nft.priceDesc} MATIC</p>
+                  </div>
+              </div>
+            ))
+          }
+          {
+            <div className="p-4">
+              <p>{showMessage}</p>
+            </div>
+          }
+          <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={checkFirebase}>
+            Search
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

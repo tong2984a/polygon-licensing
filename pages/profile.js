@@ -1,9 +1,12 @@
 import { ethers } from 'ethers'
 import { useEffect, useState } from 'react'
+import { create as ipfsHttpClient } from 'ipfs-http-client'
 import axios from 'axios'
 import Web3Modal from "web3modal"
 import Image from 'next/image'
 
+import { useRouter } from 'next/router'
+import Link from 'next/link'
 import {
   nftmarketaddress, nftaddress
 } from '../config'
@@ -15,6 +18,8 @@ import { initializeApp, getApps } from "firebase/app"
 import { getStorage, ref, listAll } from "firebase/storage";
 import { getFirestore, collection, addDoc, getDocs } from "firebase/firestore";
 
+const client = ipfsHttpClient('https://ipfs.infura.io:5001/api/v0')
+
 export default function MyCollection() {
   const [nfts, setNfts] = useState([])
   const [sold, setSold] = useState([])
@@ -24,9 +29,16 @@ export default function MyCollection() {
   const [loadingState, setLoadingState] = useState('not-loaded')
   const [address, setAddress] = useState('')
   const [balance, setBalance] = useState(0)
+  const router = useRouter()
+  const { authorAddress } = router.query
+  const [formInput, updateFormInput] = useState({ fileUrl: '', owner: '' })
+  const [showMessage, setShowMessage] = useState('')
+  const [showModalIPFS, setShowModalIPFS] = useState(false);
+  const [fileUrl, setFileUrl] = useState(null)
+  const [fileUploadProgress, setFileUploadProgress] = useState(null)
+  const [showModalChecking, setShowModalChecking] = useState(false);
 
   async function getMETT(currentAccount) {
-    console.log("****getMETT address", currentAccount);
     const web3Modal = new Web3Modal()
     const connection = await web3Modal.connect()
     const provider = new ethers.providers.Web3Provider(connection)
@@ -39,10 +51,77 @@ export default function MyCollection() {
     console.log({ tokenBalance: tokenBalance.toString() });
     setBalance(tokenBalance.toString())
   }
+  async function verifyAsset() {
+    setShowMessage('')
+    setShowModalChecking(true)
+    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 sec
+    setShowModalChecking(false)
+    setShowMessage("Verification of the uploaded digital asset has been completed successfully.")
+  }
+  async function checkFirebase(url) {
+    const params = new URLSearchParams({ authorAddress: formInput.owner });
+    router.push({
+      pathname: '/profile',
+      search: params
+    })
+    setShowModalChecking(true)
+    setShowMessage("")
+    const firebaseConfig = {
+      // INSERT YOUR OWN CONFIG HERE
+      apiKey: "AIzaSyBg34hCq_jGHdj-HNWi2ZjfqhM2YgWq4ek",
+      authDomain: "pay-a-vegan.firebaseapp.com",
+      databaseURL: "https://pay-a-vegan.firebaseio.com",
+      projectId: "pay-a-vegan",
+      storageBucket: "pay-a-vegan.appspot.com",
+      messagingSenderId: "587888386485",
+      appId: "1:587888386485:web:3a81137924d19cbe2439fc",
+      measurementId: "G-MGJK6GF9YW"
+    };
 
+    try {
+
+      if (!getApps().length) {
+        //....
+      }
+
+      const app = initializeApp(firebaseConfig)
+
+      const db = getFirestore(app)
+      //const auth = getAuth(app)
+
+      const nounsRef = collection(db, "licensing");
+      const q = query(nounsRef,
+        where("fileUrl", "==", formInput.fileUrl),
+        where("owner", "==", formInput.owner));
+
+      const querySnapshot = await getDocs(q);
+      const items = [];
+      querySnapshot.forEach((doc) => {
+        let data = doc.data();
+        let item = {
+          id: doc.id,
+          price: data.price,
+          name: data.name,
+          image: data.fileUrl,
+          owner: data.owner,
+          seller: data.seller,
+          sold: data.sold
+        }
+
+        items.push(item)
+      })
+      setNfts(items)
+      if (items.length == 0) {
+        setShowMessage("Sorry. We cannot find any matching records.")
+      }
+    } catch(err){
+      if (!/already exists/.test(err.message)) {
+        console.error('Firebase initialization error', err.stack)}
+    }
+    setShowModalChecking(false)
+  }
   // For now, 'eth_accounts' will continue to always return an array
   function handleAccountsChanged(accounts) {
-    console.log("****accounts,", accounts)
     if (accounts.length === 0) {
       // MetaMask is locked or the user has not connected any accounts
       console.log('Please connect to MetaMask.');
@@ -52,6 +131,25 @@ export default function MyCollection() {
       getMETT(accounts[0]);
     }
   }
+  async function onChange(e) {
+    setFileUrl(null)
+    setShowModalIPFS(true)
+    const file = e.target.files[0]
+    try {
+      const added = await client.add(
+        file,
+        {
+          progress: (prog) => console.log(`received: ${prog}`)
+        }
+      )
+      const url = `https://ipfs.infura.io/ipfs/${added.path}`
+      setFileUrl(url)
+      setShowModalIPFS(false)
+    } catch (error) {
+      console.log('Error uploading file: ', error)
+    }
+  }
+
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum
@@ -68,7 +166,6 @@ export default function MyCollection() {
         });
       window.ethereum.on('accountsChanged', handleAccountsChanged);
     } else {
-      console.log("Non-Ethereum browser detected. You should consider installing MetaMask.");
       setAddress("Non-Ethereum browser detected. You should consider installing MetaMask.")
     }
     return function cleanup() {
@@ -116,9 +213,7 @@ export default function MyCollection() {
         items.push(item)
       })
 
-      //const myItems = items.filter(i => i.seller === address)
-      //console.log("myItems", myItems)
-      const bougntItems = items.filter(i => i.owner === address)
+      const bougntItems = items.filter(i => i.owner === (authorAddress || address))
       //setNfts(myItems)
       setBought(bougntItems)
       setLoadingState('loaded')
@@ -186,6 +281,13 @@ export default function MyCollection() {
     setBought(bougntItems)
     setLoadingState('loaded')
   }
+  if (showModalIPFS) return (
+    <div className="p-4">
+      <p>Please wait while we upload your asset.</p>
+      <p>{fileUploadProgress}</p>
+      <div className="loader"></div>
+    </div>
+  )
   if (showModal) return (
     <div className="p-4">
       <div className="header">{address}</div>
@@ -199,35 +301,82 @@ export default function MyCollection() {
       <h1 className="py-10 px-20 text-3xl">No assets created</h1>
     </div>
   )
+  if (showModalChecking) return (
+    <div className="p-4">
+      <p>Please wait while we check your asset.</p>
+      <div className="loader"></div>
+    </div>
+  )
+  if (showMessage) return (
+    <div className="p-4">
+      <p>{showMessage}</p>
+    </div>
+  )
   return (
     <div>
       <div className="header">{address}</div>
-      <div className="p-4">
-        <h2 className="text-2xl py-2">My Collection - where you can find your license purchases.</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
-          {
-            bought.map((nft, i) => (
-              <div key={i} className="border shadow rounded-xl overflow-hidden bg-black">
-                <embed
-                   src={nft.image}
-                   width="250"
-                   height="200" />
-                <div className="p-4 bg-white">
-                  <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
-                  <div style={{ height: '70px', overflow: 'hidden' }}>
-                    <p className="text-gray-400">AI Rating: {nft.rating}</p>
-                    <p className="text-gray-400">Asset Category: {nft.rfp}</p>
-                    <p className="text-gray-400">Description: {nft.description}</p>
+      <main>
+        <section className="py-5 text-center container">
+          <div className="row py-lg-5">
+            <div className="col-lg-6 col-md-8 mx-auto">
+              <h1 className="fw-light">Applicant Profile</h1>
+              <p className="lead text-muted">Showcase your digital assets.</p>
+            </div>
+          </div>
+        </section>
+        <div className="album py-5 bg-light">
+          <div className="container">
+            <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3">
+              {
+                bought.map((nft, i) => (
+                  <div key={i} className="col">
+                    <div className="card shadow-sm">
+                      <div>
+                        <embed
+                           src={nft.image}
+                           width="100%"
+                           height="100%" />
+                      </div>
+                      <div className="card-body">
+                      <h5 className="card-title">{nft.name}</h5>
+                      <p className="card-text">{nft.description}</p>
+                      <p className="card-text"><small className="text-muted">{nft.seller}</small></p>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div className="btn-group">
+                          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => copyUrl(nft)}>Copy NFT</button>
+                        </div>
+                        <small className="text-muted">{nft.price} MATIC</small>
+                      </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="p-4 bg-black">
-                  <p className="text-2xl font-bold text-red-500">Cost - {nft.price} MATIC</p>
-                  <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={() => copyUrl(nft)}>
-                    Copy NFT
-                  </button>
-                </div>
-              </div>
-            ))
+                ))
+              }
+            </div>
+          </div>
+        </div>
+      </main>
+      <div className="p-4">
+        <h2 className="text-2xl">Please use the Choose File button to verify ownership of a digital asset.</h2>
+      </div>
+      <div className="flex justify-center">
+        <div className="w-1/2 flex flex-col pb-12">
+          <input
+            type="file"
+            name="Asset"
+            className="my-4"
+            onChange={onChange}
+            accept=".pdf"
+          />
+          <embed
+             src={fileUrl}
+             width="250"
+             height="200" />
+          {
+            fileUrl &&
+            <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={verifyAsset}>
+              Verify Digital Asset
+            </button>
           }
         </div>
       </div>

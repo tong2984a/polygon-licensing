@@ -4,6 +4,7 @@ import axios from 'axios'
 import Web3Modal from "web3modal"
 import Image from 'next/image'
 
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import {
   nftaddress, nftmarketaddress
@@ -93,7 +94,7 @@ export default function Home() {
             description: vote.description,
             sold: vote.sold,
             rating: vote.rating,
-            rfp: vote.rfp
+            seller: vote.seller
           }
           items.push(item)
         })
@@ -208,39 +209,52 @@ export default function Home() {
   return (
     <div>
       <div className="header">{address}</div>
-      <div className="p-4">
-        <h1 className="text-2xl py-2">Public Home - where digital assets are put on display for licensing.</h1>
-      </div>
-      <div className="flex justify-center">
-        <div className="px-4" style={{ maxWidth: '1600px' }}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
-            {
-              nfts.map((nft, i) => (
-                <div key={i} className="border shadow rounded-xl overflow-hidden bg-black">
-                  <embed
-                     src={nft.image}
-                     width="250"
-                     height="200" />
-                  <div className="p-4 bg-white">
-                    <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
-                    <div style={{ height: '70px', overflow: 'hidden' }}>
-                      <p className="text-gray-400">AI Rating: {nft.rating}</p>
-                      <p className="text-gray-400">Asset Category: {nft.rfp}</p>
-                      <p className="text-gray-400">{nft.description}</p>
+      <main>
+        <section className="py-5 text-center container">
+          <div className="row py-lg-5">
+            <div className="col-lg-6 col-md-8 mx-auto">
+              <h1 className="fw-light">Public Home</h1>
+              <p className="lead text-muted">Search for your artist.</p>
+            </div>
+          </div>
+        </section>
+        <div className="album py-5 bg-light">
+          <div className="container">
+            <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3">
+              {
+                nfts.map((nft, i) => (
+                  <div key={i} className="col">
+                    <div className="card shadow-sm">
+                      <div>
+                        <embed
+                           src={nft.image}
+                           width="100%"
+                           height="100%" />
+                      </div>
+                      <div className="card-body">
+                      <h5 className="card-title">{nft.name}</h5>
+                      <p className="card-text">{nft.description}</p>
+                      <p className="card-text"><small className="text-muted">{nft.seller}</small></p>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div className="btn-group">
+                          <Link href={{
+                            pathname: "/profile",
+                            query: {authorAddress: nft.seller}
+                          }} >
+                            <button type="button" className="btn btn-sm btn-outline-secondary">View</button>
+                          </Link>
+                        </div>
+                        <small className="text-muted">{nft.priceDesc} MATIC</small>
+                      </div>
+                      </div>
                     </div>
                   </div>
-                    <div className="p-4 bg-black">
-                      <p className="text-2xl mb-4 font-bold text-white">{nft.price} MATIC</p>
-                      <button className="w-full bg-pink-500 text-white font-bold py-2 px-12 rounded" onClick={() => buyFirebase(nft)}>
-                        Purchase License
-                      </button>
-                    </div>
-                </div>
-              ))
-            }
+                ))
+              }
+            </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

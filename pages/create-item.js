@@ -257,6 +257,8 @@ export default function CreateItem() {
       <div className="w-1/2 flex flex-col pb-12">
         <select value={optionsState} onChange={handleChange}>
           <option value="" disabled default>Select your digital asset category</option>
+          <option value="CV">CV</option>
+          <option value="Resume">Resume</option>
           <option value="Patent">Patent</option>
           <option value="Trade Mark">Trade Mark</option>
           <option value="Copyright">Copyright</option>
